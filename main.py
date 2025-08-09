@@ -1,28 +1,26 @@
 import logging
+import os
 import requests
 import urllib.parse
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-# 🔐 Your Bot Token
-TOKEN = "7955744196:AAG7pWKC_fcW3UQffYSyBBdyllueJfS7XL8"
+# 🔐 Get Bot Token from environment variable
+TOKEN = os.environ.get("BOT_TOKEN")
 
-# 📋 Logging
+if not TOKEN:
+    raise ValueError("BOT_TOKEN environment variable not set!")
+
+# 📋 Logging Setup
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 # 🚀 /start Command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    welcome_msg = (
-        "🔗 **TinyLink Gen**\n"
-        "Your personal fast & clean URL shortener.\n\n"
-        "📌 Send me any link and I'll shorten it using **3 services** instantly!"
-    )
-    await update.message.reply_text(welcome_msg, parse_mode="Markdown")
+    await update.message.reply_text("🔗 Hey! Send me a link to shorten:")
 
-# ✂️ Shorten Link Function with Inline Buttons
+# ✂️ Shorten Link Function
 async def shorten_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     long_url = update.message.text.strip()
-
     if not long_url.startswith("http"):
         await update.message.reply_text("❗ Please send a valid URL starting with http or https.")
         return
@@ -30,11 +28,49 @@ async def shorten_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         encoded_url = urllib.parse.quote(long_url, safe='')
 
-        # Shorteners
+        # TinyURL
+        tinyurl = None
         try:
-            tinyurl = requests.get(f"https://tinyurl.com/api-create.php?url={encoded_url}", timeout=5).text
+            r1 = requests.get(f"https://tinyurl.com/api-create.php?url={encoded_url}", timeout=5)
+            if r1.status_code == 200:
+                tinyurl = r1.text
         except:
-            tinyurl = None
+            pass
+
+        # is.gd
+        isgd = None
+        try:
+            unique_part = urllib.parse.quote('link' + str(hash(long_url)))
+            r2 = requests.get(f"https://is.gd/create.php?format=simple&url={encoded_url}&shorturl={unique_part}", timeout=5)
+            if r2.status_code == 200:
+                isgd = r2.text
+        except:
+            pass
+
+        if not tinyurl and not isgd:
+            await update.message.reply_text("⚠️ Couldn't shorten link. Please try again.")
+            return
+
+        # Prepare message
+        msg = "✨ **Your Shortened Links**\n"
+        if tinyurl:
+            msg += f"🔗 [TinyURL]({tinyurl})\n"
+        if isgd:
+            msg += f"⚡ [is.gd]({isgd})\n"
+
+        await update.message.reply_text(msg, parse_mode="Markdown", disable_web_page_preview=True)
+
+    except Exception as e:
+        logging.error(f"Error shortening link: {e}")
+        await update.message.reply_text("🚫 Error: Something went wrong. Try again later.")
+
+# 🧠 Run the Bot (Polling)
+if __name__ == "__main__":
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, shorten_link))
+    logging.info("Bot is running...")
+    app.run_polling()            tinyurl = None
 
         try:
             isgd = requests.get(f"https://is.gd/create.php?format=simple&url={encoded_url}", timeout=5).text
