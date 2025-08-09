@@ -11,7 +11,7 @@ logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 # 🚀 /start Command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔗 Hey! Send me a link to shorten:")
+    await update.message.reply_text("🔗 Hey! Send me a link to shorten using 3 services:")
 
 # ✂️ Shorten Link Function
 async def shorten_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -19,19 +19,31 @@ async def shorten_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not long_url.startswith("http"):
         await update.message.reply_text("❗ Please send a valid URL starting with http or https.")
         return
+
     try:
-        response = requests.get(f"https://tinyurl.com/api-create.php?url={long_url}")
-        if response.status_code == 200:
-            short_url = response.text
-            await update.message.reply_text(
-                f"🔗 [Click here to open the link]({short_url})\n\n✨ Powered by @Shashu9148",
-                parse_mode="Markdown",
-                disable_web_page_preview=True
-            )
-        else:
-            await update.message.reply_text("⚠️ Couldn't shorten link. Please try again.")
+        # Shortener 1: TinyURL
+        tiny_url = requests.get(f"https://tinyurl.com/api-create.php?url={long_url}").text
+
+        # Shortener 2: is.gd
+        isgd_url = requests.get(f"https://is.gd/create.php?format=simple&url={long_url}").text
+
+        # Shortener 3: shrtco.de
+        shrtco_data = requests.get(f"https://api.shrtco.de/v2/shorten?url={long_url}").json()
+        shrtco_url = shrtco_data["result"]["full_short_link"]
+
+        # Send all three clickable links
+        await update.message.reply_text(
+            f"🔗 Shortened Links:\n"
+            f"1️⃣ [TinyURL]({tiny_url})\n"
+            f"2️⃣ [is.gd]({isgd_url})\n"
+            f"3️⃣ [shrtco.de]({shrtco_url})\n\n"
+            f"✨ Powered by @Shashu9148",
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+
     except Exception:
-        await update.message.reply_text("🚫 Error: Something went wrong. Try again later.")
+        await update.message.reply_text("🚫 Error: Could not shorten the link. Please try again later.")
 
 # 🧠 Run the Bot
 if __name__ == "__main__":
